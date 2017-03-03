@@ -1,38 +1,41 @@
-#todoserver/app.py
+# todoserver/app.py
+
+import json
 
 from flask import (
     Flask, 
     make_response,
     request,
 )
-    
-import json
-app = Flask(__name__)
 
-MEMORY = {}
+from .store import TaskStore
+
+class TodoserverApp(Flask):
+    def __init__(self, name):
+        self.store = TaskStore()
+        super().__init__(name)
+    def erase_all_test_data(self):
+        assert self.testing
+        self.store.tasks.clear()
+        
+app = TodoserverApp(__name__)
 
 @app.route("/tasks/", methods=["GET"])
 def get_all_tasks():
-    tasks = [{"id": task_id, "summary": task["summary"]}
-             for task_id, task in MEMORY.items()]
+    tasks = app.store.get_all_tasks()
     return make_response(json.dumps(tasks), 200)
 
 @app.route("/tasks/", methods=["POST"])
 def create_task():
     payload = request.get_json(force=True)
-    try:
-        task_id = 1 + max(MEMORY.keys())
-    except ValueError:
-        task_id = 1
-    MEMORY[task_id] = {
-        "summary": payload["summary"],
-        "description": payload["description"],
-        }
+    task_id = app.store.create_task(
+        summary = payload["summary"],
+        description = payload["description"],
+    )
     task_info = {"id": task_id}
     return make_response(json.dumps(task_info), 201)
 
 @app.route("/tasks/<int:task_id>/")
 def task_details(task_id):
-    task_info = MEMORY[task_id].copy()
-    task_info["id"] = task_id
+    task_info = app.store.task_details(task_id)
     return json.dumps(task_info)
